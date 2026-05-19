@@ -21,10 +21,10 @@ dp = Dispatcher(storage=MemoryStorage())
 sms_service = SMSService()
 
 # Состояния FSM
-class SpamStates(StatesGroup):
+class SendStates(StatesGroup):
     waiting_for_phone = State()
     waiting_for_speed = State()
-    spamming = State()
+    sending = State()
 
 # Словарь для хранения настроек скорости
 SPEED_SETTINGS = {
@@ -41,8 +41,8 @@ user_data = {}
 async def cmd_start(message: types.Message):
     """Обработчик команды /start"""
     await message.answer(
-        "👋 Добро пожаловать в SMS Spamer Bot!\n\n"
-        "Этот бот позволяет отправлять SMS на номера СНГ (+7)\n\n"
+        "👋 Добро пожаловать в SMS Bot!\n\n"
+        "Этот бот предназначен для отправки SMS на номера РФ (+7)\n\n"
         "⚠️ Выберите действие в меню:",
         reply_markup=get_main_menu()
     )
@@ -62,7 +62,7 @@ async def show_instruction(callback: types.CallbackQuery):
     """Показать инструкцию"""
     text = (
         "📖 <b>Инструкция по использованию</b>\n\n"
-        "1️⃣ Нажмите «Начать спам» в главном меню\n"
+        "1️⃣ Нажмите «Начать отправку» в главном меню\n"
         "2️⃣ Введите номер телефона в формате:\n"
         "   • +7XXXXXXXXXX\n"
         "   • 8XXXXXXXXXX\n"
@@ -109,10 +109,10 @@ async def set_speed(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=get_main_menu()
     )
 
-@dp.callback_query(F.data == "start_spam")
-async def start_spam_process(callback: types.CallbackQuery, state: FSMContext):
-    """Начало процесса спама - запрос номера"""
-    await state.set_state(SpamStates.waiting_for_phone)
+@dp.callback_query(F.data == "start_send")
+async def start_send_process(callback: types.CallbackQuery, state: FSMContext):
+    """Начало процесса отправки - запрос номера"""
+    await state.set_state(SendStates.waiting_for_phone)
     await callback.message.edit_text(
         "📱 <b>Введите номер телефона</b>\n\n"
         "Поддерживаемые форматы:\n"
@@ -126,7 +126,7 @@ async def start_spam_process(callback: types.CallbackQuery, state: FSMContext):
     )
     await callback.answer()
 
-@dp.message(SpamStates.waiting_for_phone)
+@dp.message(SendStates.waiting_for_phone)
 async def process_phone(message: types.Message, state: FSMContext):
     """Обработка введенного номера телефона"""
     phone = message.text.strip()
@@ -146,7 +146,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=processed_phone)
     
     # Переходим к выбору скорости
-    await state.set_state(SpamStates.waiting_for_speed)
+    await state.set_state(SendStates.waiting_for_speed)
     
     await message.answer(
         f"✅ Номер принят: <code>{processed_phone}</code>\n\n"
@@ -155,9 +155,9 @@ async def process_phone(message: types.Message, state: FSMContext):
         reply_markup=get_speed_menu()
     )
 
-@dp.callback_query(SpamStates.waiting_for_speed, F.data.startswith("speed_"))
-async def start_spamming(callback: types.CallbackQuery, state: FSMContext):
-    """Запуск спама"""
+@dp.callback_query(SendStates.waiting_for_speed, F.data.startswith("speed_"))
+async def start_sending(callback: types.CallbackQuery, state: FSMContext):
+    """Запуск отправки"""
     user_id = callback.from_user.id
     speed = callback.data.split("_")[1]
     
@@ -168,14 +168,14 @@ async def start_spamming(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("❌ Ошибка: номер не найден")
         return
     
-    await state.set_state(SpamStates.spamming)
+    await state.set_state(SendStates.sending)
     
     speed_names = {"slow": "🐢 Медленно", "medium": "🚗 Средне", "fast": "🚀 Быстро", "ultra": "⚡ Максимально"}
     sms_per_sec = SPEED_SETTINGS.get(speed, 3)
     
-    # Запускаем спам
+    # Запускаем отправку
     await callback.message.edit_text(
-        f"🚀 <b>Спам запущен!</b>\n\n"
+        f"🚀 <b>Отправка запущена!</b>\n\n"
         f"📱 Номер: <code>{phone}</code>\n"
         f"⚡ Скорость: {speed_names.get(speed)} ({sms_per_sec} смс/сек)\n"
         f"📊 Отправлено: 0\n\n"
@@ -184,9 +184,9 @@ async def start_spamming(callback: types.CallbackQuery, state: FSMContext):
     )
     
     # Запускаем асинхронную отправку
-    asyncio.create_task(spam_task(callback.message, phone, sms_per_sec, state))
+    asyncio.create_task(send_task(callback.message, phone, sms_per_sec, state))
 
-async def spam_task(message: types.Message, phone: str, sms_per_sec: int, state: FSMContext):
+async def send_task(message: types.Message, phone: str, sms_per_sec: int, state: FSMContext):
     """Задача отправки SMS"""
     total_sent = 0
     total_failed = 0
@@ -198,7 +198,7 @@ async def spam_task(message: types.Message, phone: str, sms_per_sec: int, state:
     for i in range(max_sms):
         # Проверяем, не отменена ли задача
         current_state = await state.get_state()
-        if current_state != SpamStates.spamming:
+        if current_state != SendStates.sending:
             break
         
         try:
@@ -212,7 +212,7 @@ async def spam_task(message: types.Message, phone: str, sms_per_sec: int, state:
         if (i + 1) % 10 == 0:
             try:
                 await message.edit_text(
-                    f"🚀 <b>Спам в процессе...</b>\n\n"
+                    f"🚀 <b>Отправка в процессе...</b>\n\n"
                     f"📱 Номер: <code>{phone}</code>\n"
                     f"⚡ Скорость: {sms_per_sec} смс/сек\n"
                     f"📊 Отправлено: {total_sent}\n"
@@ -228,7 +228,7 @@ async def spam_task(message: types.Message, phone: str, sms_per_sec: int, state:
     # Финальное сообщение
     await state.clear()
     await message.edit_text(
-        f"✅ <b>Спам завершен!</b>\n\n"
+        f"✅ <b>Отправка завершена!</b>\n\n"
         f"📱 Номер: <code>{phone}</code>\n"
         f"📊 Всего отправлено: {total_sent}\n"
         f"❌ Ошибок: {total_failed}\n\n"
@@ -237,17 +237,17 @@ async def spam_task(message: types.Message, phone: str, sms_per_sec: int, state:
         reply_markup=get_main_menu()
     )
 
-@dp.callback_query(F.data == "stop_spam")
-async def stop_spam(callback: types.CallbackQuery, state: FSMContext):
-    """Остановка спама"""
+@dp.callback_query(F.data == "stop_send")
+async def stop_send(callback: types.CallbackQuery, state: FSMContext):
+    """Остановка отправки"""
     await state.clear()
     await callback.message.edit_text(
-        "⏹ <b>Спам остановлен</b>\n\n"
+        "⏹ <b>Отправка остановлена</b>\n\n"
         "Вернуться в меню:",
         parse_mode="HTML",
         reply_markup=get_main_menu()
     )
-    await callback.answer("Спам остановлен")
+    await callback.answer("Отправка остановлена")
 
 async def main():
     """Запуск бота"""

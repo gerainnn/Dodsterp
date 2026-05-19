@@ -4,7 +4,7 @@ def get_main_menu():
     """Главное меню бота"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Начать спам", callback_data="start_spam")],
+            [InlineKeyboardButton(text="🚀 Начать отправку", callback_data="start_send")],
             [InlineKeyboardButton(text="ℹ️ Инструкция", callback_data="instruction")],
             [InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings")],
         ]
