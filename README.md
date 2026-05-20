@@ -1,64 +1,37 @@
-# Dodsterp - Telegram Notification Bot
+# Wanderworld
 
-Telegram бот для отправки уведомлений.
+Photorealistic walking simulator in the browser. Procedurally generated infinite world with realistic biomes, mobile-first controls, and a tap-to-teleport minimap.
 
-## Описание
+> Status: **Phase 1 / 17** — bootstrap and minimal 3D scene. See [`.kiro/specs/walking-simulator/tasks.md`](.kiro/specs/walking-simulator/tasks.md) for the full plan.
 
-Проект находится в стадии активной разработки. 
+## Stack
 
-**Планируемый функционал:**
-- Отправка уведомлений пользователям
-- Управление подписками
-- Интеграция с SMS-шлюзами
-- Настраиваемые шаблоны сообщений
+- TypeScript (strict)
+- Vite 5
+- Three.js r163
+- nipplejs, simplex-noise
 
-## Технологии
-
-- Python 3.10+
-- aiogram 3.x
-- aiohttp
-
-## Установка
+## Local dev
 
 ```bash
-# Клонировать репозиторий
-git clone https://github.com/gerainnn/Dodsterp.git
-cd Dodsterp
-
-# Создать виртуальное окружение
-python -m venv venv
-source venv/bin/activate
-
-# Установить зависимости
-pip install -r requirements.txt
-
-# Создать .env файл
-cp .env.example .env
-# Добавить BOT_TOKEN в .env
-
-# Запустить бота
-python bot.py
+cd wanderworld
+npm install
+npm run dev
 ```
 
-## Структура проекта
+Open the LAN URL on your phone (Vite logs it: `http://192.168.x.x:5173`). The site is full-screen and uses touch controls.
 
-```
-Dodsterp/
-├── bot.py           # Основной файл бота
-├── config.py        # Конфигурация
-├── keyboards.py     # Клавиатуры
-├── sms_services.py  # SMS-сервисы (в разработке)
-└── requirements.txt # Зависимости
+## Build
+
+```bash
+npm run build      # → wanderworld/dist
+npm run preview    # serves the production build
 ```
 
-## Статус
+## Spec
 
-🚧 В разработке
+The full design lives in `.kiro/specs/walking-simulator/`:
 
-## TODO
-
-- [ ] Интеграция с SMS-провайдерами
-- [ ] Система подписок
-- [ ] База данных
-- [ ] Админ-панель
-- [ ] Документация API
+- `requirements.md` — what we're building, perf targets, accept criteria
+- `design.md` — architecture, modules, render pipeline
+- `tasks.md` — phased implementation plan
