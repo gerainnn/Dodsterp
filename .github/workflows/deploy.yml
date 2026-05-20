@@ -2,7 +2,7 @@ name: Deploy Wanderworld to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, wanderworld]
   workflow_dispatch:
 
 permissions:
