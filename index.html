@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Wanderworld</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b1020;
+        color: #e7ecff;
+        font-family: system-ui, -apple-system, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #scene-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      /* HUD overlay — children are absolutely positioned. */
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      #hud > * { pointer-events: auto; }
+      #joystick-zone {
+        position: fixed;
+        left: 24px;
+        bottom: 24px;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 60%, transparent 100%);
+        box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.16);
+      }
+      #crosshair {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 4px;
+        height: 4px;
+        margin-left: -2px;
+        margin-top: -2px;
+        background: rgba(255,255,255,0.55);
+        border-radius: 50%;
+        pointer-events: none;
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+      }
+      #seed-label {
+        position: fixed;
+        left: 12px;
+        top: 12px;
+        font-size: 11px;
+        opacity: 0.45;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      }
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 50% 35%, #1a2348 0%, #070a1a 70%);
+        z-index: 1000;
+        transition: opacity 500ms ease;
+      }
+      #loading.hidden { opacity: 0; pointer-events: none; }
+      .loader-card {
+        text-align: center;
+        max-width: 320px;
+        padding: 24px;
+      }
+      .loader-title {
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        margin: 0 0 8px;
+      }
+      .loader-sub {
+        font-size: 13px;
+        opacity: 0.55;
+        margin: 0 0 26px;
+      }
+      .loader-bar {
+        height: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .loader-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #6b8cff, #a4d3ff);
+        transition: width 200ms ease;
+      }
+      .loader-text {
+        margin-top: 12px;
+        font-size: 11px;
+        opacity: 0.5;
+      }
+    </style>
+    <script type="module" crossorigin src="/Dodsterp/assets/index-Bu_Vye52.js"></script>
+    <link rel="modulepreload" crossorigin href="/Dodsterp/assets/three-CQrPw82D.js">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene-canvas"></canvas>
+      <div id="hud">
+        <div id="joystick-zone"></div>
+        <div id="crosshair"></div>
+        <div id="seed-label"></div>
+        <!-- Minimap injected at runtime by ui/Minimap.ts -->
+      </div>
+    </div>
+    <div id="loading">
+      <div class="loader-card">
+        <h1 class="loader-title">WANDERWORLD</h1>
+        <p class="loader-sub">A walking simulator</p>
+        <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+        <div class="loader-text" id="loader-text">Initializing…</div>
+      </div>
+    </div>
+  </body>
+</html>
