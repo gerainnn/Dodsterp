@@ -1,35 +1,45 @@
 /**
  * Wanderworld — entry point.
- * Boots the engine and hides the loading screen once ready.
+ * Boots the engine, hides the loader, exposes seed in the URL for sharing.
  */
 import { Engine } from './core/Engine';
 import { detectDevice } from './utils/deviceDetect';
 
 async function bootstrap(): Promise<void> {
   const canvas = document.getElementById('scene-canvas') as HTMLCanvasElement | null;
-  if (!canvas) {
-    throw new Error('scene-canvas element not found');
+  const hudRoot = document.getElementById('hud') as HTMLElement | null;
+  const joystickZone = document.getElementById('joystick-zone') as HTMLElement | null;
+  if (!canvas || !hudRoot || !joystickZone) {
+    throw new Error('Required DOM mounts missing');
   }
 
   const device = detectDevice();
-  console.info('[Wanderworld] device profile:', device);
+  console.info('[Wanderworld] device profile', device);
 
-  setLoaderProgress(10, 'Creating renderer…');
+  setLoaderProgress(15, 'Booting engine…');
 
-  const engine = new Engine({ canvas, device });
+  // Optional ?seed= URL parameter for reproducible worlds.
+  const params = new URLSearchParams(window.location.search);
+  const seedParam = params.get('seed');
+  const seed = seedParam !== null ? Number.parseInt(seedParam, 10) >>> 0 : undefined;
 
-  setLoaderProgress(40, 'Building scene…');
+  const engine = new Engine({ canvas, device, joystickZone, hudRoot, seed });
+
+  setLoaderProgress(45, 'Carving terrain…');
   await engine.init();
 
-  setLoaderProgress(90, 'Warming up…');
-  // Allow one frame so first paint happens before we hide loader.
+  setLoaderProgress(85, 'Planting forests…');
   await nextFrame();
   engine.start();
 
-  setLoaderProgress(100, 'Ready');
-  hideLoader();
+  // Mirror seed into the URL so users can refresh / share their world.
+  const u = new URL(window.location.href);
+  u.searchParams.set('seed', String(engine.seed));
+  window.history.replaceState(null, '', u.toString());
 
-  // Expose for quick debugging in dev.
+  setLoaderProgress(100, 'Ready');
+  setTimeout(hideLoader, 200);
+
   if (import.meta.env.DEV) {
     (window as unknown as { __engine?: Engine }).__engine = engine;
   }
@@ -46,8 +56,7 @@ function hideLoader(): void {
   const el = document.getElementById('loading');
   if (!el) return;
   el.classList.add('hidden');
-  // Remove from DOM after transition to free pixels for the canvas.
-  setTimeout(() => el.remove(), 500);
+  setTimeout(() => el.remove(), 600);
 }
 
 function nextFrame(): Promise<void> {
