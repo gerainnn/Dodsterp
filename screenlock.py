@@ -1,13 +1,12 @@
 """
-Блокировка экрана. Пароль: 123
-Секретная комбинация: Ctrl+Shift+Q (закрывает без пароля)
+Блокировка экрана. Пароль: 1
 """
 
 import tkinter as tk
 import sys
 
 
-PASSWORD = "123"
+PASSWORD = "1"
 
 
 class ScreenLock:
@@ -22,10 +21,6 @@ class ScreenLock:
         self.root.protocol("WM_DELETE_WINDOW", lambda: None)
         self.root.bind("<Alt-F4>", lambda e: "break")
         self.root.bind("<Escape>", lambda e: "break")
-
-        # Секретная комбинация Ctrl+Shift+Q
-        self.root.bind("<Control-Shift-Q>", self.unlock)
-        self.root.bind("<Control-Shift-q>", self.unlock)
 
         self.build_ui()
 
@@ -76,7 +71,6 @@ class ScreenLock:
         )
         self.msg.pack()
 
-        # Enter тоже проверяет пароль
         self.entry.bind("<Return>", lambda e: self.check_password())
 
     def check_password(self):
