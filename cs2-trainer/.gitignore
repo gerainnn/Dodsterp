@@ -1,0 +1,10 @@
+build/
+out/
+.vs/
+*.user
+*.exe
+*.pdb
+*.obj
+*.ilk
+data/*.json
+!data/.gitkeep
