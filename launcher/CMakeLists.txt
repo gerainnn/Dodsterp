@@ -10,7 +10,10 @@ endif()
 
 add_executable(launcher
     src/main.cpp
+    src/inject/manual_map.cpp
 )
+
+target_include_directories(launcher PRIVATE src)
 
 target_compile_definitions(launcher PRIVATE
     NOMINMAX
@@ -23,4 +26,12 @@ target_link_libraries(launcher PRIVATE
     advapi32
     shell32
     user32
+    psapi
 )
+
+if(MSVC)
+    # критично для манульного маппера: запрещаем фолдить идентичный код
+    # и удалять "неиспользуемые" функции, иначе размер Loader не посчитать
+    target_link_options(launcher PRIVATE /OPT:NOICF /OPT:NOREF)
+    target_compile_options(launcher PRIVATE /utf-8)
+endif()

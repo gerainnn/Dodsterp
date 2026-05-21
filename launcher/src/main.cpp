@@ -1,10 +1,9 @@
-// Лаунчер: поднимает CS2 через Steam (steam://rungameid/730),
-// дожидается появления процесса cs2.exe и подгрузки client.dll,
-// затем стартует cs2-trainer.exe рядом с собой.
-//
-// Сейчас работает как console app — видно весь процесс, удобно дебажить.
-// Когда стабилизируется — пересобрать с /SUBSYSTEM:WINDOWS чтобы окна не
-// мелькало, ошибки гнать через MessageBox.
+// Launcher Dodsterp.
+//   1. Поднимает CS2 через Steam (steam://rungameid/730).
+//   2. Ждёт cs2.exe в process list.
+//   3. Ждёт пока подгрузится client.dll.
+//   4. Стаб времени на стабилизацию рендера.
+//   5. Manual map'ит dodsterp.dll прямо в cs2.exe.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -18,18 +17,20 @@
 #include <string>
 #include <thread>
 
+#include "inject/manual_map.hpp"
+
 namespace fs = std::filesystem;
 
 namespace {
 
-constexpr wchar_t  CS2_EXE[]       = L"cs2.exe";
-constexpr wchar_t  CS2_MODULE[]    = L"client.dll";
-constexpr wchar_t  STEAM_URL[]     = L"steam://rungameid/730";
-constexpr wchar_t  TRAINER_EXE[]   = L"cs2-trainer.exe";
+constexpr wchar_t  CS2_EXE[]    = L"cs2.exe";
+constexpr wchar_t  CS2_MODULE[] = L"client.dll";
+constexpr wchar_t  STEAM_URL[]  = L"steam://rungameid/730";
+constexpr wchar_t  DLL_NAME[]   = L"dodsterp.dll";
 
-constexpr int      WAIT_PROC_SEC   = 240;  // макс ждать запуск CS2
-constexpr int      WAIT_MOD_SEC    = 60;   // макс ждать client.dll
-constexpr int      POLL_MS         = 500;
+constexpr int      WAIT_PROC_SEC = 240;
+constexpr int      WAIT_MOD_SEC  = 60;
+constexpr int      POLL_MS       = 500;
 
 enum Color : int { CGray = 8, CRed = 12, CGreen = 10, CYellow = 14, CWhite = 15 };
 
@@ -39,8 +40,7 @@ void cprint(int color, const char* tag, const char* fmt, ...) {
     std::printf("%s ", tag);
     SetConsoleTextAttribute(h, CWhite);
 
-    va_list ap;
-    va_start(ap, fmt);
+    va_list ap; va_start(ap, fmt);
     std::vprintf(fmt, ap);
     va_end(ap);
     std::printf("\n");
@@ -50,8 +50,7 @@ DWORD find_process(const wchar_t* exe) {
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snap == INVALID_HANDLE_VALUE) return 0;
 
-    PROCESSENTRY32W e{};
-    e.dwSize = sizeof(e);
+    PROCESSENTRY32W e{}; e.dwSize = sizeof(e);
     DWORD pid = 0;
     if (Process32FirstW(snap, &e)) {
         do {
@@ -67,8 +66,7 @@ bool module_loaded(DWORD pid, const wchar_t* mod_name) {
                               FALSE, pid);
     if (!proc) return false;
 
-    HMODULE mods[1024];
-    DWORD needed = 0;
+    HMODULE mods[1024]; DWORD needed = 0;
     bool found = false;
 
     if (EnumProcessModulesEx(proc, mods, sizeof(mods), &needed,
@@ -87,16 +85,14 @@ bool module_loaded(DWORD pid, const wchar_t* mod_name) {
 }
 
 bool launch_via_steam() {
-    HINSTANCE r = ShellExecuteW(nullptr, L"open", STEAM_URL,
-                                nullptr, nullptr, SW_SHOWNORMAL);
+    HINSTANCE r = ShellExecuteW(nullptr, L"open", STEAM_URL, nullptr, nullptr,
+                                SW_SHOWNORMAL);
     return reinterpret_cast<INT_PTR>(r) > 32;
 }
 
 DWORD wait_for_cs2() {
     using namespace std::chrono;
-    auto start = steady_clock::now();
-    auto deadline = start + seconds(WAIT_PROC_SEC);
-
+    auto deadline = steady_clock::now() + seconds(WAIT_PROC_SEC);
     while (steady_clock::now() < deadline) {
         if (DWORD pid = find_process(CS2_EXE); pid) return pid;
         std::this_thread::sleep_for(milliseconds(POLL_MS));
@@ -114,28 +110,6 @@ bool wait_for_module(DWORD pid) {
     return false;
 }
 
-bool spawn_trainer(const fs::path& dir) {
-    fs::path exe = dir / TRAINER_EXE;
-    if (!fs::exists(exe)) {
-        cprint(CRed, "[-]", "trainer not found: %ls", exe.c_str());
-        return false;
-    }
-
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    PROCESS_INFORMATION pi{};
-
-    std::wstring cmd = L"\"" + exe.wstring() + L"\"";
-    if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE,
-                        0, nullptr, dir.wstring().c_str(), &si, &pi)) {
-        cprint(CRed, "[-]", "CreateProcess failed: %lu", GetLastError());
-        return false;
-    }
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    return true;
-}
-
 fs::path self_dir() {
     wchar_t buf[MAX_PATH];
     GetModuleFileNameW(nullptr, buf, MAX_PATH);
@@ -148,10 +122,17 @@ int wmain() {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleTitleW(L"DODSTERP // launcher");
 
-    cprint(CGray,   "[*]", "DODSTERP CS2 trainer launcher");
-    cprint(CGray,   "[*]", "self dir: %ls", self_dir().c_str());
+    cprint(CGray, "[*]", "DODSTERP launcher");
+    cprint(CGray, "[*]", "self dir : %ls", self_dir().c_str());
 
-    // Если CS2 уже запущен — не дёргаем Steam ещё раз.
+    auto dll_path = self_dir() / DLL_NAME;
+    if (!fs::exists(dll_path)) {
+        cprint(CRed, "[-]", "%ls not found next to launcher", DLL_NAME);
+        std::system("pause");
+        return 10;
+    }
+    cprint(CGray, "[*]", "dll path : %ls", dll_path.c_str());
+
     DWORD pid = find_process(CS2_EXE);
     if (pid) {
         cprint(CYellow, "[!]", "cs2.exe already running, pid=%lu", pid);
@@ -162,7 +143,8 @@ int wmain() {
             std::system("pause");
             return 1;
         }
-        cprint(CGray, "[*]", "waiting for cs2.exe (timeout %ds)...", WAIT_PROC_SEC);
+        cprint(CGray, "[*]", "waiting for cs2.exe (timeout %ds)...",
+               WAIT_PROC_SEC);
         pid = wait_for_cs2();
         if (!pid) {
             cprint(CRed, "[-]", "cs2.exe did not start in time");
@@ -172,25 +154,25 @@ int wmain() {
     }
     cprint(CGreen, "[+]", "cs2.exe attached, pid=%lu", pid);
 
-    cprint(CGray, "[*]", "waiting for client.dll to load (timeout %ds)...",
+    cprint(CGray, "[*]", "waiting for client.dll (timeout %ds)...",
            WAIT_MOD_SEC);
     if (!wait_for_module(pid)) {
-        cprint(CRed, "[-]", "client.dll never appeared, aborting");
+        cprint(CRed, "[-]", "client.dll never appeared");
         std::system("pause");
         return 3;
     }
     cprint(CGreen, "[+]", "client.dll loaded");
 
-    // Дополнительный простой sleep — главное меню обычно полностью готово
-    // через 4-6 секунд после подгрузки client.dll.
     cprint(CGray, "[*]", "stabilization grace (5s)...");
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    cprint(CGray, "[*]", "spawning trainer...");
-    if (!spawn_trainer(self_dir())) {
+    cprint(CGray, "[*]", "manual mapping %ls into cs2.exe...", DLL_NAME);
+    if (!inject::manual_map(pid, dll_path.wstring())) {
+        cprint(CRed, "[-]", "inject failed: %s", inject::last_error());
         std::system("pause");
         return 4;
     }
-    cprint(CGreen, "[+]", "trainer launched. exiting launcher.");
+    cprint(CGreen, "[+]", "injected. press INSERT in CS2 to toggle menu.");
+    std::this_thread::sleep_for(std::chrono::seconds(2));
     return 0;
 }
