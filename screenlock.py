@@ -1,10 +1,10 @@
 """
-Блокировка экрана. Пароль: 1
+Блокировка экрана. Открывается ТОЛЬКО паролем.
 """
 
 import tkinter as tk
 import sys
-
+import ctypes
 
 PASSWORD = "1"
 
@@ -16,13 +16,27 @@ class ScreenLock:
         self.root.attributes("-fullscreen", True)
         self.root.attributes("-topmost", True)
         self.root.configure(bg="#1a1a1a")
+        self.root.overrideredirect(True)
 
-        # Блокируем закрытие
+        # Блокируем ВСЁ
         self.root.protocol("WM_DELETE_WINDOW", lambda: None)
         self.root.bind("<Alt-F4>", lambda e: "break")
         self.root.bind("<Escape>", lambda e: "break")
+        self.root.bind("<Alt-Tab>", lambda e: "break")
+        self.root.bind("<Control-Alt-Delete>", lambda e: "break")
+        self.root.bind("<Super_L>", lambda e: "break")
+        self.root.bind("<Super_R>", lambda e: "break")
+
+        # Постоянно возвращаем фокус и topmost
+        self.root.after(100, self.keep_on_top)
 
         self.build_ui()
+
+    def keep_on_top(self):
+        self.root.attributes("-topmost", True)
+        self.root.focus_force()
+        self.entry.focus_set()
+        self.root.after(100, self.keep_on_top)
 
     def build_ui(self):
         frame = tk.Frame(self.root, bg="#1a1a1a")
@@ -80,7 +94,7 @@ class ScreenLock:
             self.msg.config(text="Неверный пароль")
             self.entry.delete(0, tk.END)
 
-    def unlock(self, event=None):
+    def unlock(self):
         self.root.destroy()
         sys.exit(0)
 
