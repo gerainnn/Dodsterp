@@ -1,5 +1,4 @@
 #include "overlay.hpp"
-#include <dwmapi.h>
 
 static const wchar_t* WND_CLASS = L"cs2_external_overlay_v1";
 
@@ -9,7 +8,7 @@ LRESULT CALLBACK Overlay::wnd_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             PostQuitMessage(0);
             return 0;
         case WM_NCHITTEST:
-            // на всякий случай — даже без WS_EX_TRANSPARENT не цепляем мышь
+            // WS_EX_TRANSPARENT уже даёт click-through, это пояс безопасности
             return HTTRANSPARENT;
     }
     return DefWindowProcW(h, msg, w, l);
@@ -39,7 +38,8 @@ bool Overlay::create(HWND target_window) {
     // чёрный — color key — становится прозрачным
     SetLayeredWindowAttributes(hwnd_, RGB(0, 0, 0), 0, LWA_COLORKEY);
 
-    if (!init_d2d_()) return false;
+    if (!init_factory_()) return false;
+    if (!create_render_target_()) return false;
 
     sync_to_target();
     ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
@@ -47,9 +47,14 @@ bool Overlay::create(HWND target_window) {
     return true;
 }
 
-bool Overlay::init_d2d_() {
+bool Overlay::init_factory_() {
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d_factory_);
-    if (FAILED(hr)) return false;
+    return SUCCEEDED(hr);
+}
+
+bool Overlay::create_render_target_() {
+    if (!d2d_factory_) return false;
+    if (rt_) { rt_->Release(); rt_ = nullptr; }
 
     RECT rc{};
     GetClientRect(hwnd_, &rc);
@@ -70,7 +75,7 @@ bool Overlay::init_d2d_() {
             D2D1::SizeU(width_, height_),
             D2D1_PRESENT_OPTIONS_IMMEDIATELY);
 
-    hr = d2d_factory_->CreateHwndRenderTarget(props, hwnd_props, &rt_);
+    HRESULT hr = d2d_factory_->CreateHwndRenderTarget(props, hwnd_props, &rt_);
     return SUCCEEDED(hr);
 }
 
@@ -106,12 +111,12 @@ void Overlay::sync_to_target() {
 void Overlay::frame(std::function<void(ID2D1HwndRenderTarget*)> draw) {
     if (!rt_) return;
     rt_->BeginDraw();
-    rt_->Clear(D2D1::ColorF(0, 0, 0, 0));   // полностью прозрачно
+    rt_->Clear(D2D1::ColorF(0, 0, 0, 0));   // полностью прозрачно (color key чёрный)
     if (draw) draw(rt_);
     HRESULT hr = rt_->EndDraw();
     if (hr == D2DERR_RECREATE_TARGET) {
-        if (rt_) { rt_->Release(); rt_ = nullptr; }
-        init_d2d_();
+        // GPU потерял device — пересобираем только rt, factory сохраняем
+        create_render_target_();
     }
 }
 

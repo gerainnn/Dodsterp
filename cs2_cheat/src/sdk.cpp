@@ -17,7 +17,9 @@ Matrix4 World::view_matrix() const {
 }
 
 uintptr_t World::pawn_at_(int idx) const {
-    // Двухуровневый entity list в Source 2.
+    // Source 2 two-level entity list:
+    //   page = list_root[ 0x10 * (idx >> 9) + 0x10 ]
+    //   ent  = page[ 0x78 * (idx & 0x1FF) ]
     uintptr_t list_root = mem_.read<uintptr_t>(client_base_ + off::client::dwEntityList);
     if (!list_root) return 0;
 
@@ -42,12 +44,15 @@ std::vector<PawnSnapshot> World::enemies(int local_team, int max_ents) const {
         int hp = mem_.read<int>(pawn + off::base_entity::m_iHealth);
         if (hp <= 0 || hp > 100) continue;
 
-        int team = mem_.read<int>(pawn + off::base_entity::m_iTeamNum);
+        // m_iTeamNum is uint8 in CS2 schema — reading as int would grab garbage
+        int team = static_cast<int>(
+            mem_.read<uint8_t>(pawn + off::base_entity::m_iTeamNum));
         if (team == local_team) continue;
-        if (team != 2 && team != 3) continue;   // только T(2) / CT(3)
+        if (team != off::TEAM_T && team != off::TEAM_CT) continue;
 
-        int life = mem_.read<uint8_t>(pawn + off::base_entity::m_lifeState);
-        if (life != 0) continue;
+        int life = static_cast<int>(
+            mem_.read<uint8_t>(pawn + off::base_entity::m_lifeState));
+        if (life != 0) continue;   // 0 = LIFE_ALIVE
 
         uintptr_t scene = mem_.read<uintptr_t>(pawn + off::base_entity::m_pGameSceneNode);
         if (!scene) continue;

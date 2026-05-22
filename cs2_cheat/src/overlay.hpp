@@ -41,7 +41,8 @@ private:
     ID2D1Factory*          d2d_factory_ = nullptr;
     ID2D1HwndRenderTarget* rt_          = nullptr;
 
-    bool init_d2d_();
+    bool init_factory_();
+    bool create_render_target_();
     void resize_rt_(int w, int h);
 
     static LRESULT CALLBACK wnd_proc(HWND, UINT, WPARAM, LPARAM);
