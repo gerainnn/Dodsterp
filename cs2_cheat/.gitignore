@@ -1,0 +1,15 @@
+build/
+out/
+cmake-build-*/
+.vs/
+*.user
+*.suo
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.obj
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
